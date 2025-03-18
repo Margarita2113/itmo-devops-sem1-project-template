@@ -2,16 +2,23 @@ package main
 
 import (
 	"fmt"
-	_ "github.com/jackc/pgx/v5"
 	"os"
 	"os/signal"
+	"syscall"
+
+	_ "github.com/jackc/pgx/v5"
+
 	"project_sem/internal/postgres"
 	"project_sem/internal/server"
-	"syscall"
 )
 
 func main() {
 	fmt.Println("Start application")
+
+	sigs := make(chan os.Signal, 1)
+	// Указываем, что нас интересуют SIGINT, SIGSTOP и SIGTERM
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGSTOP)
+
 	db, err := postgres.NewDB()
 	if err != nil {
 		fmt.Println(err)
@@ -19,22 +26,12 @@ func main() {
 	}
 	defer db.Close()
 
-	err = db.Migrate()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	fmt.Println("Database migration complete")
-
 	err = server.NewServer(db)
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	sigs := make(chan os.Signal, 1)
-	// Указываем, что нас интересуют SIGINT и SIGTERM
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGSTOP)
-
+	fmt.Println("Server started")
 	<-sigs
 	fmt.Println("application stopped")
 }

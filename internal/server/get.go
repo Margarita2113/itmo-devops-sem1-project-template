@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"project_sem/internal/zip"
 	"time"
+
+	"project_sem/internal/zip"
 )
 
 func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {

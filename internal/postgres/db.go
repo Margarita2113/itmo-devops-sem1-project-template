@@ -3,16 +3,20 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"os"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+
 	"project_sem/internal/model"
 )
 
 type Postgres interface {
-	Migrate() error
 	Get() ([]*model.Product, error)
-	Create(*model.Product) error
+	Create(*sql.Tx, *model.Product) error
+	Begin() (*sql.Tx, error)
 	Close()
+	GetUnicCategory(tx *sql.Tx) (int, error)
+	GetTotalPrice(tx *sql.Tx) (float64, error)
 }
 
 type postgess struct {
@@ -37,20 +41,6 @@ func (p *postgess) Close() {
 	p.db.Close()
 }
 
-const migrateSQL = `CREATE TABLE IF NOT EXISTS prices (id INTEGER,
- name varchar(30),
-    category varchar(30),
-    price double precision,
-    create_date date)`
-
-func (p *postgess) Migrate() error {
-	_, err := p.db.Exec(migrateSQL)
-	if err != nil {
-		return fmt.Errorf("error postgres %w", err)
-	}
-	return nil
-}
-
 const getSQL = `SELECT id, name,category,price,create_date FROM prices`
 
 func (p *postgess) Get() ([]*model.Product, error) {
@@ -69,16 +59,44 @@ func (p *postgess) Get() ([]*model.Product, error) {
 		}
 		products = append(products, &product)
 	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error rows scan %w", err)
+	}
 	return products, nil
 }
 
 const insertSQL = `INSERT INTO prices ( id, name,category,price,create_date ) 
 VALUES ($1,$2,$3,$4,$5 )`
 
-func (p *postgess) Create(pr *model.Product) error {
-	_, err := p.db.Exec(insertSQL, pr.ID, pr.Name, pr.Category, pr.Price, pr.Data)
+func (p *postgess) Create(tx *sql.Tx, pr *model.Product) error {
+	_, err := tx.Exec(insertSQL, pr.ID, pr.Name, pr.Category, pr.Price, pr.Data)
 	if err != nil {
 		return fmt.Errorf("error postgres %w", err)
 	}
 	return nil
+}
+
+const totalPriceSQL = `SELECT SUM(price) AS TotalPrice FROM prices`
+
+func (p *postgess) GetTotalPrice(tx *sql.Tx) (float64, error) {
+	var totalPriceVal float64
+	if err := tx.QueryRow(totalPriceSQL).Scan(&totalPriceVal); err != nil {
+		return 0, fmt.Errorf("error postgres %w", err)
+	}
+	return totalPriceVal, nil
+}
+
+const totalCountCategorySQL = `SELECT COUNT(DISTINCT category) FROM prices `
+
+func (p *postgess) GetUnicCategory(tx *sql.Tx) (int, error) {
+	var totalCountCategory int
+	if err := tx.QueryRow(totalCountCategorySQL).Scan(&totalCountCategory); err != nil {
+		return 0, fmt.Errorf("error postgres %w", err)
+	}
+	return totalCountCategory, nil
+}
+
+func (p *postgess) Begin() (*sql.Tx, error) {
+	return p.db.Begin()
 }
