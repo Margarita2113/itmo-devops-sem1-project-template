@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func Unzip(zipReader io.ReaderAt, destination string, zipFileSize int64) ([][]string, error) {
@@ -27,6 +28,9 @@ func Unzip(zipReader io.ReaderAt, destination string, zipFileSize int64) ([][]st
 			os.MkdirAll(filePath, os.ModePerm)
 			continue
 		}
+		if !strings.Contains(file.FileInfo().Name(), ".csv") {
+			continue
+		}
 
 		reader, err := file.Open()
 		if err != nil {
@@ -37,7 +41,7 @@ func Unzip(zipReader io.ReaderAt, destination string, zipFileSize int64) ([][]st
 		if err != nil {
 			return nil, fmt.Errorf("read data error %w", err)
 		}
-		allRecords = append(allRecords, readAll...)
+		allRecords = append(allRecords, readAll[1:]...) // без header
 	}
 
 	return allRecords, nil

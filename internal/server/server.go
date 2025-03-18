@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+
 	"project_sem/internal/postgres"
 )
 
@@ -16,10 +17,13 @@ func NewServer(db postgres.Postgres) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc(`/api/v0/prices`, h.Handler)
 
-	err := http.ListenAndServe(`:8080`, mux)
-	if err != nil {
-		return fmt.Errorf("error server %w", err)
-	}
+	go func() {
+		err := http.ListenAndServe(`:8080`, mux)
+		if err != nil {
+			fmt.Println("error server %w", err)
+		}
+	}()
+
 	return nil
 }
 

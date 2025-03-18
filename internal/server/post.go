@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
 	"project_sem/internal/model"
 	"project_sem/internal/zip"
 )
@@ -38,31 +39,48 @@ func (h *Handler) POSTHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var resp response
-	var unicCategory map[string]string
+	tx, err := h.db.Begin()
+	if err != nil {
+		fmt.Println("error begin transaction")
+		return
+	}
+	defer func() {
+		err := tx.Rollback()
+		if err != nil {
+			fmt.Println("error rollback transaction")
+		}
+	}()
+
 	for _, record := range records {
 		product, err := model.NewProduct(record)
 		if err != nil {
 			fmt.Println("error creating product: %w", err)
-			continue
+			return
 		}
-		if err = h.db.Create(product); err != nil {
+		if err = h.db.Create(tx, product); err != nil {
 			fmt.Println("error creating product db: %w", err)
-			continue
+			return
+		}
+
+		category, err := h.db.GetUnicCategory(tx)
+		if err != nil {
+			fmt.Println("error getting category: %w", err)
+			return
+		}
+		totalPrice, err := h.db.GetTotalPrice(tx)
+		if err != nil {
+			fmt.Println("error getting total price: %w", err)
+			return
 		}
 
 		resp.TotalItems++
-		if _, ok := unicCategory[product.Category]; !ok {
-			resp.TotalCategories++
-		}
+		resp.TotalCategories = category
+		resp.TotalPrice = totalPrice
 	}
-
-	allProducts, err := h.db.Get()
+	err = tx.Commit()
 	if err != nil {
-		fmt.Println("error getting products: %w", err)
+		fmt.Println("error commit transaction", err)
 		return
-	}
-	for _, product := range allProducts {
-		resp.TotalPrice = resp.TotalPrice + product.Price
 	}
 
 	marshal, err := json.Marshal(resp)
