@@ -61,22 +61,16 @@ func (h *Handler) POSTHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("error creating product db: %w", err)
 			return
 		}
-
-		category, err := h.db.GetUnicCategory(tx)
-		if err != nil {
-			fmt.Println("error getting category: %w", err)
-			return
-		}
-		totalPrice, err := h.db.GetTotalPrice(tx)
-		if err != nil {
-			fmt.Println("error getting total price: %w", err)
-			return
-		}
-
 		resp.TotalItems++
-		resp.TotalCategories = category
-		resp.TotalPrice = totalPrice
+
 	}
+	category, totalPrice, err := h.db.GetTotalPriceAndUnicCategory(tx)
+	if err != nil {
+		fmt.Println("error getting total price: %w", err)
+		return
+	}
+	resp.TotalCategories = category
+	resp.TotalPrice = totalPrice
 	err = tx.Commit()
 	if err != nil {
 		fmt.Println("error commit transaction", err)
