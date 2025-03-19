@@ -15,8 +15,7 @@ type Postgres interface {
 	Create(*sql.Tx, *model.Product) error
 	Begin() (*sql.Tx, error)
 	Close()
-	GetUnicCategory(tx *sql.Tx) (int, error)
-	GetTotalPrice(tx *sql.Tx) (float64, error)
+	GetTotalPriceAndUnicCategory(tx *sql.Tx) (int, float64, error)
 }
 
 type postgess struct {
@@ -77,24 +76,15 @@ func (p *postgess) Create(tx *sql.Tx, pr *model.Product) error {
 	return nil
 }
 
-const totalPriceSQL = `SELECT SUM(price) AS TotalPrice FROM prices`
+const totalPriceAndUnicCategorySQL = `SELECT COUNT(DISTINCT category), SUM(price)  FROM prices `
 
-func (p *postgess) GetTotalPrice(tx *sql.Tx) (float64, error) {
-	var totalPriceVal float64
-	if err := tx.QueryRow(totalPriceSQL).Scan(&totalPriceVal); err != nil {
-		return 0, fmt.Errorf("error postgres %w", err)
-	}
-	return totalPriceVal, nil
-}
-
-const totalCountCategorySQL = `SELECT COUNT(DISTINCT category) FROM prices `
-
-func (p *postgess) GetUnicCategory(tx *sql.Tx) (int, error) {
+func (p *postgess) GetTotalPriceAndUnicCategory(tx *sql.Tx) (int, float64, error) {
 	var totalCountCategory int
-	if err := tx.QueryRow(totalCountCategorySQL).Scan(&totalCountCategory); err != nil {
-		return 0, fmt.Errorf("error postgres %w", err)
+	var totalPriceVal float64
+	if err := tx.QueryRow(totalPriceAndUnicCategorySQL).Scan(&totalCountCategory, &totalPriceVal); err != nil {
+		return 0, 0, fmt.Errorf("error postgres %w", err)
 	}
-	return totalCountCategory, nil
+	return totalCountCategory, totalPriceVal, nil
 }
 
 func (p *postgess) Begin() (*sql.Tx, error) {
